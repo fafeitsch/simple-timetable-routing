@@ -1,12 +1,23 @@
 package routing
 
 import (
-	"strings"
+	"fmt"
 	"time"
 )
 
 type Timetable struct {
 	Stops []Stop
+}
+
+func (t *Timetable) buildGraph() graph {
+	vertices := make([]*vertex, 0, len(t.Stops))
+	vertexMap := make(map[string]*vertex)
+	for _, stop := range t.Stops {
+		vertex := &vertex{data: &stop}
+		vertexMap[stop.Id] = vertex
+
+	}
+	return graph{vertices: vertices}
 }
 
 type Stop struct {
@@ -15,16 +26,33 @@ type Stop struct {
 	Events []Event
 }
 
-type StopGroup struct {
-	Stops []Stop
+func (s *Stop) String() string {
+	return fmt.Sprintf("Stop[Id=\"%s\", Name=\"%s\"]", s.Id, s.Name)
 }
 
-func (s *StopGroup) String() string {
-	result := make([]string, 0, len(s.Stops))
-	for _, stop := range s.Stops {
-		result = append(result, stop.Name)
+func (s *Stop) computeEdges(vertices map[string]*vertex) []edge {
+	eventGroups := s.groupEvents()
+	result := make([]edge, 0, 0)
+	for _, event := range eventGroups {
+		edge := edge{target: vertices[event[0].NextStop.Name]}
+		edge = edge
 	}
-	return strings.Join(result, ",")
+	return result
+}
+
+func (s *Stop) groupEvents() map[string][]Event {
+	result := make(map[string][]Event)
+	for _, event := range s.Events {
+		if event.NextStop == nil || event.Departure == nil {
+			continue
+		}
+		list, ok := result[event.NextStop.Id]
+		if !ok {
+			list = make([]Event, 0, 0)
+		}
+		list = append(list, event)
+	}
+	return result
 }
 
 type Line struct {
@@ -33,9 +61,11 @@ type Line struct {
 }
 
 type Event struct {
-	Arrival   *time.Time
-	Departure *time.Time
-	Line      *Line
+	Arrival    *time.Time
+	Departure  *time.Time
+	Line       *Line
+	NextStop   *Stop
+	TravelTime *time.Duration
 }
 
 type Connection struct {

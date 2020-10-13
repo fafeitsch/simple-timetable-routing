@@ -7,7 +7,7 @@ import (
 )
 
 type vertex struct {
-	data        *StopGroup
+	data        *Stop
 	neighbors   []edge
 	weight      time.Time
 	index       int
@@ -15,7 +15,7 @@ type vertex struct {
 }
 
 func (v *vertex) String() string {
-	return fmt.Sprintf("StopGroup-Vertex(\"%s\")", v.data.String())
+	return fmt.Sprintf("Vertex[%s]", v.data.String())
 }
 
 type edge struct {
@@ -28,25 +28,13 @@ type graph struct {
 }
 
 func (g *graph) shortestPath(s *vertex, t *vertex, start time.Time) []*vertex {
-	var sFound, tFound bool
 	priorityQueue := &priorityQueue{}
 	for _, vertex := range g.vertices {
-		tFound = tFound || vertex == t
-		if vertex == s {
-			vertex.weight = start
-			sFound = true
-		} else {
-			vertex.weight = time.Time{}
-		}
+		vertex.weight = time.Time{}
 		priorityQueue.Push(vertex)
 	}
+	s.weight = start
 	heap.Init(priorityQueue)
-	if !sFound {
-		panic(fmt.Sprintf("the provided start vertex %v was not found in the graph", s))
-	}
-	if !tFound {
-		panic(fmt.Sprintf("the provided target vertex %v was not found in the graph", t))
-	}
 	for len(*priorityQueue) != 0 {
 		v := heap.Pop(priorityQueue).(*vertex)
 		for _, edge := range v.neighbors {
