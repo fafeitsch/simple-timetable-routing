@@ -16,7 +16,9 @@ func (t *Timetable) buildGraph() graph {
 	for _, stop := range t.Stops {
 		vertex := &vertex{data: &stop}
 		vertexMap[stop.Id] = vertex
-
+	}
+	for _, stop := range t.Stops {
+		stop.computeEdges(vertexMap)
 	}
 	return graph{vertices: vertices}
 }
@@ -35,20 +37,21 @@ func (s *Stop) computeEdges(vertices map[string]*vertex) []edge {
 	eventGroups := s.groupEvents()
 	result := make([]edge, 0, 0)
 	for _, event := range eventGroups {
-		edge := edge{target: vertices[event[0].NextStop.Name]}
-		edge = edge
+		edge := edge{target: vertices[event[0].NextStop.Name], weight: event.weightFunction()}
+		result = append(result, edge)
 	}
 	return result
 }
 
-func (s *Stop) groupEvents() map[string][]Event {
-	result := make(map[string][]Event)
+func (s *Stop) groupEvents() map[string]EventGroup {
+	result := make(map[string]EventGroup)
 	for _, event := range s.Events {
 		list, ok := result[event.NextStop.Id]
 		if !ok {
 			list = make([]Event, 0, 0)
 		}
 		list = append(list, event)
+		result[event.NextStop.Id] = list
 	}
 	return result
 }
@@ -57,7 +60,7 @@ type EventGroup []Event
 
 func (e EventGroup) weightFunction() edgeWeight {
 	return func(t time.Time, currentLine *Line) (time.Duration, *Line, bool) {
-		arrivalMap := make(map[time.Time]*Event)
+		arrivalMap := make(map[time.Time]Event)
 		arrivals := make([]time.Time, 0, len(e))
 		for _, event := range e {
 			switchTime := 0 * time.Minute
@@ -65,7 +68,7 @@ func (e EventGroup) weightFunction() edgeWeight {
 				switchTime = 5 * time.Minute
 			}
 			if event.Departure.After(t.Add(switchTime)) {
-				arrivalMap[event.ArrivalAtNextStop] = &event
+				arrivalMap[event.ArrivalAtNextStop] = event
 				arrivals = append(arrivals, event.ArrivalAtNextStop)
 			}
 		}
