@@ -7,6 +7,7 @@ import (
 )
 
 type vertex struct {
+	currentLine *Line
 	data        *Stop
 	neighbors   []edge
 	weight      time.Time
@@ -18,8 +19,10 @@ func (v *vertex) String() string {
 	return fmt.Sprintf("Vertex[%s]", v.data.String())
 }
 
+type edgeWeight func(time time.Time, currentLine *Line) (time.Duration, *Line, bool)
+
 type edge struct {
-	weight func(time time.Time) time.Duration
+	weight edgeWeight
 	target *vertex
 }
 
@@ -39,9 +42,15 @@ func (g *graph) shortestPath(s *vertex, t *vertex, start time.Time) []*vertex {
 		v := heap.Pop(priorityQueue).(*vertex)
 		for _, edge := range v.neighbors {
 			neighbour := edge.target
-			waitTime := v.weight.Add(edge.weight(v.weight))
+			weight, line, ok := edge.weight(v.weight, v.currentLine)
+			if !ok {
+				// there is no suitable departure to that neighbour any more, skip it.
+				continue
+			}
+			waitTime := v.weight.Add(weight)
 			if (neighbour.weight == time.Time{} || waitTime.Before(neighbour.weight)) {
 				neighbour.weight = waitTime
+				neighbour.currentLine = line
 				neighbour.predecessor = v
 				priorityQueue.update(neighbour)
 			}

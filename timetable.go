@@ -2,6 +2,7 @@ package routing
 
 import (
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -43,9 +44,6 @@ func (s *Stop) computeEdges(vertices map[string]*vertex) []edge {
 func (s *Stop) groupEvents() map[string][]Event {
 	result := make(map[string][]Event)
 	for _, event := range s.Events {
-		if event.NextStop == nil || event.Departure == nil {
-			continue
-		}
 		list, ok := result[event.NextStop.Id]
 		if !ok {
 			list = make([]Event, 0, 0)
@@ -55,17 +53,43 @@ func (s *Stop) groupEvents() map[string][]Event {
 	return result
 }
 
+type EventGroup []Event
+
+func (e EventGroup) weightFunction() edgeWeight {
+	return func(t time.Time, currentLine *Line) (time.Duration, *Line, bool) {
+		arrivalMap := make(map[time.Time]*Event)
+		arrivals := make([]time.Time, 0, len(e))
+		for _, event := range e {
+			switchTime := 0 * time.Minute
+			if event.Line != currentLine {
+				switchTime = 5 * time.Minute
+			}
+			if event.Departure.After(t.Add(switchTime)) {
+				arrivalMap[event.ArrivalAtNextStop] = &event
+				arrivals = append(arrivals, event.ArrivalAtNextStop)
+			}
+		}
+		if len(arrivals) == 0 {
+			return 0 * time.Minute, nil, false
+		}
+		sort.Slice(arrivals, func(i, j int) bool {
+			return arrivals[i].Before(arrivals[j])
+		})
+		event := arrivalMap[arrivals[0]]
+		return event.ArrivalAtNextStop.Sub(t), event.Line, true
+	}
+}
+
 type Line struct {
 	Id   string
 	Name string
 }
 
 type Event struct {
-	Arrival    *time.Time
-	Departure  *time.Time
-	Line       *Line
-	NextStop   *Stop
-	TravelTime *time.Duration
+	ArrivalAtNextStop time.Time
+	Departure         time.Time
+	Line              *Line
+	NextStop          *Stop
 }
 
 type Connection struct {

@@ -30,7 +30,7 @@ func TestGraph_shortestPath(t *testing.T) {
 	}
 	d.data = &Stop{Name: "D"}
 	d.neighbors = []edge{
-		{target: c, weight: constantWeight(5)},
+		{target: c, weight: unsatisfiedWeight()},
 		{target: f, weight: constantWeight(45)},
 		{target: e, weight: constantWeight(10)},
 	}
@@ -53,12 +53,23 @@ func TestGraph_shortestPath(t *testing.T) {
 		start, _ := time.Parse(time.RFC3339, "2020-10-11T18:00:00Z")
 		path := graph.shortestPath(a, f, start)
 		assert.Equal(t, []*vertex{a, b, d, e, f}, path, "path not computed correctly")
+		for _, v := range path[1:] {
+			assert.Equal(t, usedLine, v.currentLine, "currentLine must be set on visited vertex %s", v.data.Name)
+		}
 		assert.Equal(t, "2020-10-11T18:40:00Z", f.weight.Format(time.RFC3339), "arrival time not computed correctly")
 	})
 }
 
-func constantWeight(weight int) func(time.Time) time.Duration {
-	return func(t time.Time) time.Duration {
-		return time.Duration(weight) * time.Minute
+var usedLine = &Line{Id: "12 South", Name: "12 South"}
+
+func constantWeight(weight int) edgeWeight {
+	return func(moment time.Time, line *Line) (time.Duration, *Line, bool) {
+		return time.Duration(weight) * time.Minute, usedLine, true
+	}
+}
+
+func unsatisfiedWeight() edgeWeight {
+	return func(t time.Time, currentLine *Line) (time.Duration, *Line, bool) {
+		return 0 * time.Minute, nil, false
 	}
 }
