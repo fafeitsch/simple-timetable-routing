@@ -2,6 +2,7 @@ package routing
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -61,6 +62,42 @@ func TestEventGroup_WeightFunction(t *testing.T) {
 		now := date("16:00")
 		_, _, b := function(now, harbourExpress)
 		assert.False(t, b, "no connection should be found any more")
+	})
+}
+
+func Test_createConnection(t *testing.T) {
+	southBound := &Line{Name: "1 SouthBound", Id: "1"}
+	harbour := &Line{Name: "2 Harbour", Id: "2"}
+
+	zoo := &Stop{Name: "Zoo", Id: "ZO"}
+	mall := &Stop{Name: "Mall", Id: "MA"}
+	court := &Stop{Name: "Court", Id: "CO"}
+	mainStreet := &Stop{Name: "Main Street", Id: "MS"}
+	centralStation := &Stop{Name: "Central Station", Id: "CS"}
+
+	v1 := &vertex{data: zoo}
+	v2 := &vertex{data: mall, currentLine: southBound}
+	v3 := &vertex{data: court, currentLine: southBound}
+	v4 := &vertex{data: mainStreet, currentLine: southBound}
+	v5 := &vertex{data: centralStation, currentLine: harbour}
+	path := []*vertex{v1, v2, v3, v4, v5}
+
+	t.Run("test big", func(t *testing.T) {
+		got := createConnection(path)
+		require.Equal(t, 2, len(got.Legs), "number of legs is wrong")
+		assert.Equal(t, southBound, got.Legs[0].Line, "line of leg 0 not correct")
+		assert.Equal(t, harbour, got.Legs[1].Line, "line of leg 1 not correct")
+		assert.Equal(t, zoo, got.Legs[0].FirstStop, "first stop of leg 0 not correct")
+		assert.Equal(t, mainStreet, got.Legs[0].LastStop, "last stop of leg 0 not correct")
+		assert.Equal(t, mainStreet, got.Legs[1].FirstStop, "first stop of leg 1 not correct")
+		assert.Equal(t, centralStation, got.Legs[1].LastStop, "last stop of leg 1 not correct")
+	})
+	t.Run("small", func(t *testing.T) {
+		got := createConnection(path[3:])
+		require.Equal(t, 1, len(got.Legs), "number of legs is wrong")
+		assert.Equal(t, harbour, got.Legs[0].Line, "line of leg 0 not correct")
+		assert.Equal(t, mainStreet, got.Legs[0].FirstStop, "first stop of leg 1 not correct")
+		assert.Equal(t, centralStation, got.Legs[0].LastStop, "last stop of leg 1 not correct")
 	})
 }
 

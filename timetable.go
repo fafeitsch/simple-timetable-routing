@@ -7,20 +7,36 @@ import (
 )
 
 type Timetable struct {
-	Stops []Stop
+	stops map[string]*vertex
+	graph graph
 }
 
-func (t *Timetable) buildGraph() graph {
-	vertices := make([]*vertex, 0, len(t.Stops))
+func NewTimetable(stops []Stop) Timetable {
+	vertices := make([]*vertex, 0, len(stops))
 	vertexMap := make(map[string]*vertex)
-	for _, stop := range t.Stops {
+	for _, stop := range stops {
 		vertex := &vertex{data: &stop}
 		vertexMap[stop.Id] = vertex
 	}
-	for _, stop := range t.Stops {
+	for _, stop := range stops {
 		stop.computeEdges(vertexMap)
 	}
-	return graph{vertices: vertices}
+	t := Timetable{}
+	t.graph = graph{vertices: vertices}
+	return Timetable{graph: graph{vertices: vertices}, stops: vertexMap}
+}
+
+func (t *Timetable) Query(source *Stop, target *Stop, start time.Time) *Connection {
+	s, ok := t.stops[source.Id]
+	if !ok {
+		panic(fmt.Sprintf("source \"%s\" not found in the timetable", source))
+	}
+	ta, ok := t.stops[target.Id]
+	if !ok {
+		panic(fmt.Sprintf("target \"%v\" not found in the timetable", target))
+	}
+	path := t.graph.shortestPath(s, ta, start)
+	return createConnection(path)
 }
 
 type Stop struct {
@@ -96,5 +112,31 @@ type Event struct {
 }
 
 type Connection struct {
-	duration time.Duration
+	Duration time.Duration
+	Legs     []Leg
+}
+
+func createConnection(path []*vertex) *Connection {
+	if len(path) < 2 {
+		return nil
+	}
+	legs := make([]Leg, 0, 0)
+	firstStop := path[0]
+	currentLine := path[1].currentLine
+	remaining := path[1:]
+	for i, v := range remaining {
+		if v.currentLine != currentLine {
+			legs = append(legs, Leg{Line: currentLine, FirstStop: firstStop.data, LastStop: remaining[i-1].data})
+			currentLine = v.currentLine
+			firstStop = remaining[i-1]
+		}
+	}
+	legs = append(legs, Leg{Line: currentLine, FirstStop: firstStop.data, LastStop: path[len(path)-1].data})
+	return &Connection{Legs: legs}
+}
+
+type Leg struct {
+	Line      *Line
+	FirstStop *Stop
+	LastStop  *Stop
 }
