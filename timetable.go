@@ -2,9 +2,32 @@ package routing
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"time"
 )
+
+type Time struct {
+	Minute int
+	Hour   int
+}
+
+func (t *Time) interpret(date time.Time) time.Time {
+	return time.Date(date.Year(), date.Month(), date.Day(), t.Hour, t.Minute, 0, 0, date.Location())
+}
+
+var TimeRegex = regexp.MustCompile("^([0-9]{2}):?([0-5][0-9])$")
+
+func ParseTime(string string) Time {
+	submatch := TimeRegex.FindStringSubmatch(string)
+	if submatch == nil {
+		panic(fmt.Sprintf("the string \"%s\" does not match the required format", string))
+	}
+	hour, _ := strconv.Atoi(submatch[1])
+	minute, _ := strconv.Atoi(submatch[2])
+	return Time{Hour: hour, Minute: minute}
+}
 
 type Timetable struct {
 	stops map[string]*vertex
@@ -18,15 +41,16 @@ func NewTimetable(stops []Stop) Timetable {
 		vertex := &vertex{data: &stop}
 		vertexMap[stop.Id] = vertex
 	}
-	for _, stop := range stops {
-		stop.computeEdges(vertexMap)
-	}
 	t := Timetable{}
 	t.graph = graph{vertices: vertices}
 	return Timetable{graph: graph{vertices: vertices}, stops: vertexMap}
 }
 
 func (t *Timetable) Query(source *Stop, target *Stop, start time.Time) *Connection {
+	for _, stop := range t.stops {
+		edges := stop.data.computeEdges(start, t.stops)
+		stop.neighbors = edges
+	}
 	s, ok := t.stops[source.Id]
 	if !ok {
 		panic(fmt.Sprintf("source \"%s\" not found in the timetable", source))
@@ -49,11 +73,11 @@ func (s *Stop) String() string {
 	return fmt.Sprintf("Stop[Id=\"%s\", Name=\"%s\"]", s.Id, s.Name)
 }
 
-func (s *Stop) computeEdges(vertices map[string]*vertex) []edge {
+func (s *Stop) computeEdges(date time.Time, vertices map[string]*vertex) []edge {
 	eventGroups := s.groupEvents()
 	result := make([]edge, 0, 0)
 	for _, event := range eventGroups {
-		edge := edge{target: vertices[event[0].NextStop.Name], weight: event.weightFunction()}
+		edge := edge{target: vertices[event[0].NextStop.Name], weight: event.weightFunction(date)}
 		result = append(result, edge)
 	}
 	return result
@@ -74,7 +98,7 @@ func (s *Stop) groupEvents() map[string]EventGroup {
 
 type EventGroup []Event
 
-func (e EventGroup) weightFunction() edgeWeight {
+func (e EventGroup) weightFunction(date time.Time) edgeWeight {
 	return func(t time.Time, currentLine *Line) (time.Duration, *Line, bool) {
 		arrivalMap := make(map[time.Time]Event)
 		arrivals := make([]time.Time, 0, len(e))
@@ -83,9 +107,9 @@ func (e EventGroup) weightFunction() edgeWeight {
 			if event.Line != currentLine {
 				switchTime = 5 * time.Minute
 			}
-			if event.Departure.After(t.Add(switchTime)) {
-				arrivalMap[event.ArrivalAtNextStop] = event
-				arrivals = append(arrivals, event.ArrivalAtNextStop)
+			if event.Departure.interpret(date).After(t.Add(switchTime)) {
+				arrivalMap[event.ArrivalAtNextStop.interpret(date)] = event
+				arrivals = append(arrivals, event.ArrivalAtNextStop.interpret(date))
 			}
 		}
 		if len(arrivals) == 0 {
@@ -95,7 +119,8 @@ func (e EventGroup) weightFunction() edgeWeight {
 			return arrivals[i].Before(arrivals[j])
 		})
 		event := arrivalMap[arrivals[0]]
-		return event.ArrivalAtNextStop.Sub(t), event.Line, true
+		arrival := event.ArrivalAtNextStop.interpret(date)
+		return arrival.Sub(t), event.Line, true
 	}
 }
 
@@ -105,8 +130,8 @@ type Line struct {
 }
 
 type Event struct {
-	ArrivalAtNextStop time.Time
-	Departure         time.Time
+	ArrivalAtNextStop Time
+	Departure         Time
 	Line              *Line
 	NextStop          *Stop
 }

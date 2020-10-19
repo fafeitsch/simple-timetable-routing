@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+func TestNewTimetable(t *testing.T) {
+
+}
+
 func TestStop_groupEvents(t *testing.T) {
 	zoo := &Stop{Name: "Zoo", Id: "ZO"}
 	mall := &Stop{Name: "Mall", Id: "MA"}
@@ -36,16 +40,16 @@ func TestEventGroup_WeightFunction(t *testing.T) {
 	harbour := &Line{Name: "2 Harbour", Id: "2"}
 	harbourExpress := &Line{Name: "2a Harbour", Id: "2a"}
 
-	e1 := Event{Line: southBound, Departure: date("14:30"), ArrivalAtNextStop: date("14:35")}
-	e2 := Event{Line: southBound, Departure: date("14:39"), ArrivalAtNextStop: date("14:44")}
-	e3 := Event{Line: southBound, Departure: date("14:48"), ArrivalAtNextStop: date("14:53")}
-	e4 := Event{Line: harbour, Departure: date("14:35"), ArrivalAtNextStop: date("14:48")}
-	e6 := Event{Line: harbourExpress, Departure: date("14:35"), ArrivalAtNextStop: date("14:47")}
+	e1 := Event{Line: southBound, Departure: ParseTime("14:30"), ArrivalAtNextStop: ParseTime("14:35")}
+	e2 := Event{Line: southBound, Departure: ParseTime("14:39"), ArrivalAtNextStop: ParseTime("14:44")}
+	e3 := Event{Line: southBound, Departure: ParseTime("14:48"), ArrivalAtNextStop: ParseTime("14:53")}
+	e4 := Event{Line: harbour, Departure: ParseTime("14:35"), ArrivalAtNextStop: ParseTime("14:48")}
+	e6 := Event{Line: harbourExpress, Departure: ParseTime("14:35"), ArrivalAtNextStop: ParseTime("14:47")}
 
 	group := EventGroup([]Event{e1, e2, e3, e4, e6})
-	function := group.weightFunction()
 	t.Run("without change", func(t *testing.T) {
 		now := date("14:34")
+		function := group.weightFunction(now)
 		duration, line, b := function(now, harbour)
 		assert.Equal(t, 14*time.Minute, duration, "duration is wrong")
 		assert.Equal(t, harbour, line, "line after event is wrong")
@@ -53,6 +57,7 @@ func TestEventGroup_WeightFunction(t *testing.T) {
 	})
 	t.Run("with change", func(t *testing.T) {
 		now := date("14:30")
+		function := group.weightFunction(now)
 		duration, line, b := function(now, harbour)
 		assert.Equal(t, 14*time.Minute, duration, "duration is wrong")
 		assert.Equal(t, southBound, line, "line after event is wrong")
@@ -60,6 +65,7 @@ func TestEventGroup_WeightFunction(t *testing.T) {
 	})
 	t.Run("no departure found", func(t *testing.T) {
 		now := date("16:00")
+		function := group.weightFunction(now)
 		_, _, b := function(now, harbourExpress)
 		assert.False(t, b, "no connection should be found any more")
 	})
