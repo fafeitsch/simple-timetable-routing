@@ -34,12 +34,18 @@ func (g *graph) shortestPath(s *vertex, t *vertex, start time.Time) []*vertex {
 	priorityQueue := &priorityQueue{}
 	for _, vertex := range g.vertices {
 		vertex.weight = time.Time{}
+		vertex.predecessor = nil
+		vertex.currentLine = nil
 		priorityQueue.Push(vertex)
 	}
 	s.weight = start
 	heap.Init(priorityQueue)
 	for len(*priorityQueue) != 0 {
 		v := heap.Pop(priorityQueue).(*vertex)
+		if (v.weight == time.Time{}) {
+			// v was not reached before and cannot be used for the route
+			continue
+		}
 		for _, edge := range v.neighbors {
 			neighbour := edge.target
 			weight, line, ok := edge.weight(v.weight, v.currentLine)

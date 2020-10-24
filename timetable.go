@@ -34,12 +34,13 @@ type Timetable struct {
 	graph graph
 }
 
-func NewTimetable(stops []Stop) Timetable {
+func NewTimetable(stops []*Stop) Timetable {
 	vertices := make([]*vertex, 0, len(stops))
 	vertexMap := make(map[string]*vertex)
 	for _, stop := range stops {
-		vertex := &vertex{data: &stop}
+		vertex := &vertex{data: stop}
 		vertexMap[stop.Id] = vertex
+		vertices = append(vertices, vertex)
 	}
 	t := Timetable{}
 	t.graph = graph{vertices: vertices}
@@ -77,7 +78,7 @@ func (s *Stop) computeEdges(date time.Time, vertices map[string]*vertex) []edge 
 	eventGroups := s.groupEvents()
 	result := make([]edge, 0, 0)
 	for _, event := range eventGroups {
-		edge := edge{target: vertices[event[0].NextStop.Name], weight: event.weightFunction(date)}
+		edge := edge{target: vertices[event[0].nextStop().Id], weight: event.weightFunction(date)}
 		result = append(result, edge)
 	}
 	return result
@@ -86,12 +87,12 @@ func (s *Stop) computeEdges(date time.Time, vertices map[string]*vertex) []edge 
 func (s *Stop) groupEvents() map[string]EventGroup {
 	result := make(map[string]EventGroup)
 	for _, event := range s.Events {
-		list, ok := result[event.NextStop.Id]
+		list, ok := result[event.nextStop().Id]
 		if !ok {
 			list = make([]Event, 0, 0)
 		}
 		list = append(list, event)
-		result[event.NextStop.Id] = list
+		result[event.nextStop().Id] = list
 	}
 	return result
 }
@@ -104,12 +105,16 @@ func (e EventGroup) weightFunction(date time.Time) edgeWeight {
 		arrivals := make([]time.Time, 0, len(e))
 		for _, event := range e {
 			switchTime := 0 * time.Minute
-			if event.Line != currentLine {
+			// if currentLine == nil, we are at the source station
+			if currentLine != nil && event.Line != currentLine {
 				switchTime = 5 * time.Minute
 			}
-			if event.Departure.interpret(date).After(t.Add(switchTime)) {
-				arrivalMap[event.ArrivalAtNextStop.interpret(date)] = event
-				arrivals = append(arrivals, event.ArrivalAtNextStop.interpret(date))
+			departure := event.Departure.interpret(date)
+			switchFinished := t.Add(switchTime)
+			if departure.Equal(switchFinished) || departure.After(switchFinished) {
+				arrival := departure.Add(event.durationToNextStop())
+				arrivalMap[arrival] = event
+				arrivals = append(arrivals, arrival)
 			}
 		}
 		if len(arrivals) == 0 {
@@ -119,26 +124,40 @@ func (e EventGroup) weightFunction(date time.Time) edgeWeight {
 			return arrivals[i].Before(arrivals[j])
 		})
 		event := arrivalMap[arrivals[0]]
-		arrival := event.ArrivalAtNextStop.interpret(date)
+		arrival := arrivals[0]
 		return arrival.Sub(t), event.Line, true
 	}
 }
 
 type Line struct {
-	Id   string
-	Name string
+	Id        string
+	Name      string
+	startStop *Stop
+	Segments  []Segment
+}
+
+type Segment struct {
+	TravelTime time.Duration
+	NextStop   *Stop
 }
 
 type Event struct {
-	ArrivalAtNextStop Time
-	Departure         Time
-	Line              *Line
-	NextStop          *Stop
+	Departure Time
+	Line      *Line
+	Segment   *Segment
+}
+
+func (e *Event) nextStop() *Stop {
+	return e.Segment.NextStop
+}
+
+func (e *Event) durationToNextStop() time.Duration {
+	return e.Segment.TravelTime
 }
 
 type Connection struct {
-	Duration time.Duration
-	Legs     []Leg
+	Arrival time.Time
+	Legs    []Leg
 }
 
 func createConnection(path []*vertex) *Connection {
@@ -157,7 +176,7 @@ func createConnection(path []*vertex) *Connection {
 		}
 	}
 	legs = append(legs, Leg{Line: currentLine, FirstStop: firstStop.data, LastStop: path[len(path)-1].data})
-	return &Connection{Legs: legs}
+	return &Connection{Legs: legs, Arrival: path[len(path)-1].weight}
 }
 
 type Leg struct {
