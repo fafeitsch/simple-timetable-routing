@@ -8,32 +8,40 @@ import (
 	"time"
 )
 
-type Time struct {
-	Minute int
-	Hour   int
+// Time is a string data type that can be interpreted as simple time
+// (without date). The time string should always match the TimeRegex,
+// otherwise a panic may be risen.
+//
+// Examples: 12:04, 14:34, 28:23 are all valid times
+type Time string
+
+// CreateTime creates a time string from a given hour and minute.
+func CreateTime(hour, minute int) Time {
+	return Time(fmt.Sprintf("%02d:%02d", hour, minute))
 }
 
-func (t *Time) interpret(date time.Time) time.Time {
-	return time.Date(date.Year(), date.Month(), date.Day(), t.Hour, t.Minute, 0, 0, date.Location())
-}
+// TimeRegex is used to validate time strings.
+var TimeRegex = regexp.MustCompile("^([0-9]+):?([0-5][0-9])$")
 
-var TimeRegex = regexp.MustCompile("^([0-9]{2}):?([0-5][0-9])$")
-
-func ParseTime(string string) Time {
-	submatch := TimeRegex.FindStringSubmatch(string)
+func (t Time) interpret(date time.Time) time.Time {
+	submatch := TimeRegex.FindStringSubmatch(string(t))
 	if submatch == nil {
-		panic(fmt.Sprintf("the string \"%s\" does not match the required format", string))
+		panic(fmt.Sprintf("the string \"%s\" does not match the required format", t))
 	}
 	hour, _ := strconv.Atoi(submatch[1])
 	minute, _ := strconv.Atoi(submatch[2])
-	return Time{Hour: hour, Minute: minute}
+	return time.Date(date.Year(), date.Month(), date.Day(), hour, minute, 0, 0, date.Location())
 }
 
+// Timetable contains all routing information in a public transport network.
+// Timetables should be created with the NewTimetable function.
 type Timetable struct {
 	stops map[string]*vertex
 	graph graph
 }
 
+// NewTimetable creates a new timetable containing the passed stops. The stops
+// contain all relevant information about the transport network (arrivals, departures, and lines).
 func NewTimetable(stops []*Stop) Timetable {
 	vertices := make([]*vertex, 0, len(stops))
 	vertexMap := make(map[string]*vertex)
@@ -47,6 +55,8 @@ func NewTimetable(stops []*Stop) Timetable {
 	return Timetable{graph: graph{vertices: vertices}, stops: vertexMap}
 }
 
+// Query computes the fastest route between source and target with the specified start time.
+// If there is no connection, then nil is returned.
 func (t *Timetable) Query(source *Stop, target *Stop, start time.Time) *Connection {
 	for _, stop := range t.stops {
 		edges := stop.data.computeEdges(start, t.stops)
@@ -64,10 +74,17 @@ func (t *Timetable) Query(source *Stop, target *Stop, start time.Time) *Connecti
 	return createConnection(path)
 }
 
+// Stop is a physical stop where a public transport vehicle stops and lets
+// passengers enter and exit. The Id of the stop must be unique.
 type Stop struct {
 	Id     string
 	Name   string
 	Events []Event
+}
+
+// NewStop creates a new stop with the given id and name and an empty events slice.
+func NewStop(id, name string) *Stop {
+	return &Stop{Id: id, Name: name, Events: make([]Event, 0, 0)}
 }
 
 func (s *Stop) computeEdges(date time.Time, vertices map[string]*vertex) []edge {
@@ -80,8 +97,8 @@ func (s *Stop) computeEdges(date time.Time, vertices map[string]*vertex) []edge 
 	return result
 }
 
-func (s *Stop) groupEvents() map[string]EventGroup {
-	result := make(map[string]EventGroup)
+func (s *Stop) groupEvents() map[string]eventGroup {
+	result := make(map[string]eventGroup)
 	for _, event := range s.Events {
 		list, ok := result[event.nextStop().Id]
 		if !ok {
@@ -93,9 +110,9 @@ func (s *Stop) groupEvents() map[string]EventGroup {
 	return result
 }
 
-type EventGroup []Event
+type eventGroup []Event
 
-func (e EventGroup) weightFunction(date time.Time) edgeWeight {
+func (e eventGroup) weightFunction(date time.Time) edgeWeight {
 	return func(t time.Time, currentLine *Line) (time.Duration, *Line, bool) {
 		arrivalMap := make(map[time.Time]Event)
 		arrivals := make([]time.Time, 0, len(e))
@@ -125,6 +142,10 @@ func (e EventGroup) weightFunction(date time.Time) edgeWeight {
 	}
 }
 
+// Line represents a line in a public transportation network. It consists
+// of an Id, which should be unique among all lines, as well as stops and segments.
+// Variants of lines (e.g. additional stops in the rush hour) must be modeled with
+// additional lines.
 type Line struct {
 	Id        string
 	Name      string
@@ -132,11 +153,15 @@ type Line struct {
 	Segments  []Segment
 }
 
+// Segment describes the travel time from the last stop in a line to the next stop
+// in the line.
 type Segment struct {
 	TravelTime time.Duration
 	NextStop   *Stop
 }
 
+// Event describes the departure of a certain line's vehicle at a station. The segment property
+// points to the line segment that describes the journey to the next stop after the event's stop.
 type Event struct {
 	Departure Time
 	Line      *Line
@@ -151,6 +176,9 @@ func (e *Event) durationToNextStop() time.Duration {
 	return e.Segment.TravelTime
 }
 
+// Connection is the result of a route computation. It contains the arrival time
+// as well a slice of legs which describe the lines that have to be taken at certain stations
+// in order to reach the target station.
 type Connection struct {
 	Arrival time.Time
 	Legs    []Leg
@@ -175,6 +203,8 @@ func createConnection(path []*vertex) *Connection {
 	return &Connection{Legs: legs, Arrival: path[len(path)-1].weight}
 }
 
+// Leg is a part of a journey during which there is no change of lines. A leg
+// has the first stop, a last stop and a line.
 type Leg struct {
 	Line      *Line
 	FirstStop *Stop
