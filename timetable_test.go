@@ -31,17 +31,6 @@ func TestTimetable_Query(t *testing.T) {
 		{TravelTime: 3 * time.Minute, NextStop: docksAE},
 		{TravelTime: 5 * time.Minute, NextStop: airport}},
 	}
-	greenLine := &Line{Id: "#00FF00", Name: "Green Line", startStop: docksAE, Segments: []Segment{
-		{TravelTime: 2 * time.Minute, NextStop: docksFG},
-	}}
-	whiteLine := &Line{Id: "#FFFFFF", Name: "White Line", startStop: marketPlace, Segments: []Segment{
-		{TravelTime: 2 * time.Minute, NextStop: chalet},
-		{TravelTime: 2 * time.Minute, NextStop: schusterStreet},
-		{TravelTime: 1 * time.Minute, NextStop: historicMall},
-		{TravelTime: 3 * time.Minute, NextStop: northAvenue},
-		{TravelTime: 2 * time.Minute, NextStop: mainStation},
-	}}
-	_, _ = greenLine, whiteLine
 
 	for hour := 8; hour < 20; hour++ {
 		// blue line (every twenty minutes)
@@ -62,7 +51,7 @@ func TestTimetable_Query(t *testing.T) {
 			if j == 11 {
 				docksAE.Events = append(docksAE.Events, Event{Departure: Time{Hour: hour + 1, Minute: 2}, Segment: &redLine.Segments[3], Line: redLine})
 			} else {
-				docksAE.Events = append(docksAE.Events, Event{Departure: Time{Hour: hour + 1, Minute: j*5 + 7}, Segment: &redLine.Segments[3], Line: redLine})
+				docksAE.Events = append(docksAE.Events, Event{Departure: Time{Hour: hour, Minute: j*5 + 7}, Segment: &redLine.Segments[3], Line: redLine})
 			}
 		}
 	}
@@ -115,6 +104,17 @@ func TestTimetable_Query(t *testing.T) {
 		assert.Equal(t, blueLine, connection.Legs[1].Line, "line is wrong")
 		assert.Equal(t, date("10:53"), connection.Arrival, "time is wrong")
 	})
+
+	t.Run("start station not found", func(*testing.T) {
+		assert.PanicsWithValue(t, "source \"Palace\" not found in the timetable", func() {
+			timetable.Query(&Stop{Id: "Palace"}, chalet, time.Now())
+		})
+	})
+	t.Run("target station not found", func(*testing.T) {
+		assert.PanicsWithValue(t, "target \"Palace\" not found in the timetable", func() {
+			timetable.Query(chalet, &Stop{Id: "Palace"}, time.Now())
+		})
+	})
 }
 
 func TestStop_groupEvents(t *testing.T) {
@@ -149,15 +149,23 @@ func TestEventGroup_WeightFunction(t *testing.T) {
 	e1 := Event{Line: southBound, Departure: ParseTime("14:30"), Segment: &Segment{TravelTime: 5 * time.Minute}}
 	e2 := Event{Line: southBound, Departure: ParseTime("14:39"), Segment: &Segment{TravelTime: 5 * time.Minute}}
 	e3 := Event{Line: southBound, Departure: ParseTime("14:48"), Segment: &Segment{TravelTime: 5 * time.Minute}}
-	e4 := Event{Line: harbour, Departure: ParseTime("14:35"), Segment: &Segment{TravelTime: 13 * time.Minute}}
+	e4 := Event{Line: harbour, Departure: ParseTime("14:35"), Segment: &Segment{TravelTime: 8 * time.Minute}}
 	e6 := Event{Line: harbourExpress, Departure: ParseTime("14:35"), Segment: &Segment{TravelTime: 12 * time.Minute}}
 
 	group := EventGroup([]Event{e1, e2, e3, e4, e6})
 	t.Run("without change", func(t *testing.T) {
 		now := date("14:34")
 		function := group.weightFunction(now)
-		duration, line, b := function(now, harbour)
-		assert.Equal(t, 14*time.Minute, duration, "duration is wrong")
+		duration, line, b := function(now, southBound)
+		assert.Equal(t, 10*time.Minute, duration, "duration is wrong")
+		assert.Equal(t, southBound, line, "line after event is wrong")
+		assert.True(t, b, "connection should be found")
+	})
+	t.Run("without start line", func(t *testing.T) {
+		now := date("14:34")
+		function := group.weightFunction(now)
+		duration, line, b := function(now, nil)
+		assert.Equal(t, 9*time.Minute, duration, "duration is wrong")
 		assert.Equal(t, harbour, line, "line after event is wrong")
 		assert.True(t, b, "connection should be found")
 	})
@@ -165,8 +173,8 @@ func TestEventGroup_WeightFunction(t *testing.T) {
 		now := date("14:30")
 		function := group.weightFunction(now)
 		duration, line, b := function(now, harbour)
-		assert.Equal(t, 14*time.Minute, duration, "duration is wrong")
-		assert.Equal(t, southBound, line, "line after event is wrong")
+		assert.Equal(t, 13*time.Minute, duration, "duration is wrong")
+		assert.Equal(t, harbour, line, "line after event is wrong")
 		assert.True(t, b, "connection should be found")
 	})
 	t.Run("no departure found", func(t *testing.T) {

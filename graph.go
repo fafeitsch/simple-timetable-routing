@@ -2,7 +2,6 @@ package routing
 
 import (
 	"container/heap"
-	"fmt"
 	"time"
 )
 
@@ -13,10 +12,6 @@ type vertex struct {
 	weight      time.Time
 	index       int
 	predecessor *vertex
-}
-
-func (v *vertex) String() string {
-	return fmt.Sprintf("Vertex[%s]", v.data.String())
 }
 
 type edgeWeight func(time time.Time, currentLine *Line) (time.Duration, *Line, bool)

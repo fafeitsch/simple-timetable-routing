@@ -54,11 +54,11 @@ func (t *Timetable) Query(source *Stop, target *Stop, start time.Time) *Connecti
 	}
 	s, ok := t.stops[source.Id]
 	if !ok {
-		panic(fmt.Sprintf("source \"%s\" not found in the timetable", source))
+		panic(fmt.Sprintf("source \"%s\" not found in the timetable", source.Id))
 	}
 	ta, ok := t.stops[target.Id]
 	if !ok {
-		panic(fmt.Sprintf("target \"%v\" not found in the timetable", target))
+		panic(fmt.Sprintf("target \"%s\" not found in the timetable", target.Id))
 	}
 	path := t.graph.shortestPath(s, ta, start)
 	return createConnection(path)
@@ -68,10 +68,6 @@ type Stop struct {
 	Id     string
 	Name   string
 	Events []Event
-}
-
-func (s *Stop) String() string {
-	return fmt.Sprintf("Stop[Id=\"%s\", Name=\"%s\"]", s.Id, s.Name)
 }
 
 func (s *Stop) computeEdges(date time.Time, vertices map[string]*vertex) []edge {
