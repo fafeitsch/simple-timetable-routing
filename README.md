@@ -29,24 +29,14 @@ Quick Guide:
     ```
 2. Define your lines:
     ```go
-    blueLine := &Line{Id: "#0000FF", Name: "Blue Line", startStop: mainStation, Segments: []Segment{
-      {TravelTime: 2 * time.Minute, NextStop: northAvenue},
-      {TravelTime: 3 * time.Minute, NextStop: historicMall},
-      {TravelTime: 1 * time.Minute, NextStop: schusterStreet},
-      {TravelTime: 2 * time.Minute, NextStop: chalet}},
-      }
-    redLine := &Line{Id: "#FF0000", Name: "Red Line", startStop: northEnd, Segments: []Segment{
-      {TravelTime: 2 * time.Minute, NextStop: northAvenue},
-      {TravelTime: 2 * time.Minute, NextStop: mainStation},
-      {TravelTime: 3 * time.Minute, NextStop: docksAE},
-      {TravelTime: 5 * time.Minute, NextStop: airport}},
-    }
+    blueLine := &Line{Id: "#0000FF", Name: "Blue Line", startStop: mainStation}
+    redLine := &Line{Id: "#FF0000", Name: "Red Line", startStop: northEnd}
     ```
 3. Define events on the stops:
     ```go
        mainStation.Events = []Event{
-         {Departure: "8:02", Line: blueLine, LineSegment: blueLine.Segments[2]},
-         {Departure: "8:05", Line: redLine, LineSegment: redLine.Segments[0]}
+         {Departure: "8:02", Line: blueLine, TravelTime: 2 * time.Minute, NextStop: northAvenue, LineSegment: blueLine.Segments[2]},
+         {Departure: "8:05", Line: redLine, TravelTime: 3 * time.Minute, NextStop: historicMall, LineSegment: redLine.Segments[0]}
          ...
        }   
     ```

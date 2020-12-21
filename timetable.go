@@ -143,37 +143,30 @@ func (e eventGroup) weightFunction(date time.Time) edgeWeight {
 }
 
 // Line represents a line in a public transportation network. It consists
-// of an Id, which should be unique among all lines, as well as stops and segments.
-// Variants of lines (e.g. additional stops in the rush hour) must be modeled with
+// of an Id, which should be unique among all lines.
+// Variants of lines (e.g. additional stops in the rush hour) should be modeled with
 // additional lines.
 type Line struct {
 	Id        string
 	Name      string
 	startStop *Stop
-	Segments  []Segment
-}
-
-// Segment describes the travel time from the last stop in a line to the next stop
-// in the line.
-type Segment struct {
-	TravelTime time.Duration
-	NextStop   *Stop
 }
 
 // Event describes the departure of a certain line's vehicle at a station. The segment property
 // points to the line segment that describes the journey to the next stop after the event's stop.
 type Event struct {
-	Departure Time
-	Line      *Line
-	Segment   *Segment
+	Departure  Time
+	Line       *Line
+	NextStop   *Stop
+	TravelTime time.Duration
 }
 
 func (e *Event) nextStop() *Stop {
-	return e.Segment.NextStop
+	return e.NextStop
 }
 
 func (e *Event) durationToNextStop() time.Duration {
-	return e.Segment.TravelTime
+	return e.TravelTime
 }
 
 // Connection is the result of a route computation. It contains the arrival time

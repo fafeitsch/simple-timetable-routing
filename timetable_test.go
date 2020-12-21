@@ -19,39 +19,29 @@ func TestTimetable_Query(t *testing.T) {
 	chalet := NewStop("CH", "Chalet")
 	northEnd := NewStop("NE", "North End")
 
-	blueLine := &Line{Id: "#0000FF", Name: "Blue Line", startStop: mainStation, Segments: []Segment{
-		{TravelTime: 2 * time.Minute, NextStop: northAvenue},
-		{TravelTime: 3 * time.Minute, NextStop: historicMall},
-		{TravelTime: 1 * time.Minute, NextStop: schusterStreet},
-		{TravelTime: 2 * time.Minute, NextStop: chalet}},
-	}
-	redLine := &Line{Id: "#FF0000", Name: "Red Line", startStop: northEnd, Segments: []Segment{
-		{TravelTime: 2 * time.Minute, NextStop: northAvenue},
-		{TravelTime: 2 * time.Minute, NextStop: mainStation},
-		{TravelTime: 3 * time.Minute, NextStop: docksAE},
-		{TravelTime: 5 * time.Minute, NextStop: airport}},
-	}
+	blueLine := &Line{Id: "#0000FF", Name: "Blue Line", startStop: mainStation}
+	redLine := &Line{Id: "#FF0000", Name: "Red Line", startStop: northEnd}
 
 	for hour := 8; hour < 20; hour++ {
 		// blue line (every twenty minutes)
 		for j := 0; j < 3; j++ {
-			mainStation.Events = append(mainStation.Events, Event{Departure: CreateTime(hour, j*20+5), Segment: &blueLine.Segments[0], Line: blueLine})
-			northAvenue.Events = append(northAvenue.Events, Event{Departure: CreateTime(hour, j*20+7), Segment: &blueLine.Segments[1], Line: blueLine})
-			historicMall.Events = append(historicMall.Events, Event{Departure: CreateTime(hour, j*20+10), Segment: &blueLine.Segments[2], Line: blueLine})
-			schusterStreet.Events = append(schusterStreet.Events, Event{Departure: CreateTime(hour, j*20+11), Segment: &blueLine.Segments[3], Line: blueLine})
+			mainStation.Events = append(mainStation.Events, Event{TravelTime: 2 * time.Minute, NextStop: northAvenue, Departure: CreateTime(hour, j*20+5), Line: blueLine})
+			northAvenue.Events = append(northAvenue.Events, Event{TravelTime: 3 * time.Minute, NextStop: historicMall, Departure: CreateTime(hour, j*20+7), Line: blueLine})
+			historicMall.Events = append(historicMall.Events, Event{TravelTime: 1 * time.Minute, NextStop: schusterStreet, Departure: CreateTime(hour, j*20+10), Line: blueLine})
+			schusterStreet.Events = append(schusterStreet.Events, Event{TravelTime: 2 * time.Minute, NextStop: chalet, Departure: CreateTime(hour, j*20+11), Line: blueLine})
 		}
 	}
 
 	for hour := 10; hour < 20; hour++ {
 		// red line (from 10 to 20 o'clock) every five minutes
 		for j := 0; j < 12; j++ {
-			northEnd.Events = append(northEnd.Events, Event{Departure: CreateTime(hour, j*5), Segment: &redLine.Segments[0], Line: redLine})
-			northAvenue.Events = append(northAvenue.Events, Event{Departure: CreateTime(hour, j*5+2), Segment: &redLine.Segments[1], Line: redLine})
-			mainStation.Events = append(mainStation.Events, Event{Departure: CreateTime(hour, j*5+4), Segment: &redLine.Segments[2], Line: redLine})
+			northEnd.Events = append(northEnd.Events, Event{TravelTime: 2 * time.Minute, NextStop: northAvenue, Departure: CreateTime(hour, j*5), Line: redLine})
+			northAvenue.Events = append(northAvenue.Events, Event{TravelTime: 2 * time.Minute, NextStop: mainStation, Departure: CreateTime(hour, j*5+2), Line: redLine})
+			mainStation.Events = append(mainStation.Events, Event{TravelTime: 3 * time.Minute, NextStop: docksAE, Departure: CreateTime(hour, j*5+4), Line: redLine})
 			if j == 11 {
-				docksAE.Events = append(docksAE.Events, Event{Departure: CreateTime(hour+1, 2), Segment: &redLine.Segments[3], Line: redLine})
+				docksAE.Events = append(docksAE.Events, Event{TravelTime: 5 * time.Minute, NextStop: airport, Departure: CreateTime(hour+1, 2), Line: redLine})
 			} else {
-				docksAE.Events = append(docksAE.Events, Event{Departure: CreateTime(hour, j*5+7), Segment: &redLine.Segments[3], Line: redLine})
+				docksAE.Events = append(docksAE.Events, Event{TravelTime: 5 * time.Minute, NextStop: airport, Departure: CreateTime(hour, j*5+7), Line: redLine})
 			}
 		}
 	}
@@ -123,13 +113,13 @@ func TestStop_groupEvents(t *testing.T) {
 	court := &Stop{Name: "Court", Id: "CO"}
 	mainStreet := &Stop{Name: "Main Street", Id: "MS"}
 
-	e1 := Event{Segment: &Segment{NextStop: zoo}}
-	e2 := Event{Segment: &Segment{NextStop: mall}}
-	e3 := Event{Segment: &Segment{NextStop: zoo}}
-	e4 := Event{Segment: &Segment{NextStop: court}}
-	e5 := Event{Segment: &Segment{NextStop: zoo}}
-	e6 := Event{Segment: &Segment{NextStop: mainStreet}}
-	e7 := Event{Segment: &Segment{NextStop: mainStreet}}
+	e1 := Event{NextStop: zoo}
+	e2 := Event{NextStop: mall}
+	e3 := Event{NextStop: zoo}
+	e4 := Event{NextStop: court}
+	e5 := Event{NextStop: zoo}
+	e6 := Event{NextStop: mainStreet}
+	e7 := Event{NextStop: mainStreet}
 
 	centralStation := &Stop{Name: "Central Station", Id: "CS", Events: []Event{e1, e2, e3, e4, e5, e6, e7}}
 	groups := centralStation.groupEvents()
@@ -146,11 +136,11 @@ func TestEventGroup_WeightFunction(t *testing.T) {
 	harbour := &Line{Name: "2 Harbour", Id: "2"}
 	harbourExpress := &Line{Name: "2a Harbour", Id: "2a"}
 
-	e1 := Event{Line: southBound, Departure: "14:30", Segment: &Segment{TravelTime: 5 * time.Minute}}
-	e2 := Event{Line: southBound, Departure: "14:39", Segment: &Segment{TravelTime: 5 * time.Minute}}
-	e3 := Event{Line: southBound, Departure: "14:48", Segment: &Segment{TravelTime: 5 * time.Minute}}
-	e4 := Event{Line: harbour, Departure: "14:35", Segment: &Segment{TravelTime: 8 * time.Minute}}
-	e6 := Event{Line: harbourExpress, Departure: "14:35", Segment: &Segment{TravelTime: 12 * time.Minute}}
+	e1 := Event{Line: southBound, Departure: "14:30", TravelTime: 5 * time.Minute}
+	e2 := Event{Line: southBound, Departure: "14:39", TravelTime: 5 * time.Minute}
+	e3 := Event{Line: southBound, Departure: "14:48", TravelTime: 5 * time.Minute}
+	e4 := Event{Line: harbour, Departure: "14:35", TravelTime: 8 * time.Minute}
+	e6 := Event{Line: harbourExpress, Departure: "14:35", TravelTime: 12 * time.Minute}
 
 	group := eventGroup([]Event{e1, e2, e3, e4, e6})
 	t.Run("without change", func(t *testing.T) {
